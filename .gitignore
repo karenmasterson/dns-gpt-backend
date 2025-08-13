@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+!*.example
+# Databricks/ipynb artifacts
+*.ipynb_checkpoints/
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+# Uvicorn logs
+*.log
+
+# Node junk (if any)
+node_modules/
+
+# Milvus local (if you ever use milvus-lite artifacts)
+*.db
+
