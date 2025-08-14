@@ -11,17 +11,13 @@ from .config import TOP_K, RETURN_K
 
 app = FastAPI(title="DNS-GPT Backend", version="0.1.0")
 
-# NOTE: The URL you shared (vercel.com/karen-mastersons-projects) is the dashboard.
-# Replace ALLOWED_ORIGINS with your actual deployed app URL, e.g.:
-#   https://dns-gpt.vercel.app
 ALLOWED_ORIGINS = [
-    "https://karen-mastersons-projects.vercel.app",   # update once you have the app URL
+    "https://dns-gpt-frontend.vercel.app",  # live frontend
 ]
-
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
