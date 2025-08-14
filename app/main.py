@@ -1,12 +1,12 @@
 # app/main.py
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
+from typing import List, Optional
 
 from .schemas import AskRequest, AskResponse, Hit
 from .guards import rate_limit_ok, sanitize_and_check
 from .embeddings import embed_texts
-from .milvus_client import get_collection, search_vectors
+from .milvus_client import get_collection, search_vectors, recent_anomalies
 from .config import TOP_K, RETURN_K
 
 app = FastAPI(title="DNS-GPT Backend", version="0.1.0")
@@ -91,3 +91,19 @@ async def search(req: Request, body: AskRequest):
 @app.post("/ask", response_model=AskResponse)
 async def ask(req: Request, body: AskRequest):
     return await search(req, body)
+
+@app.get("/recent")
+def recent(
+    n: int = Query(20, ge=1, le=100),
+    hours: int = Query(48, ge=1, le=168),
+    country_code: Optional[str] = None,
+    rdata_trimmed: Optional[str] = None,
+    anomaly_only: bool = False,
+):
+    items = recent_anomalies(
+        n=n, hours=hours,
+        country_code=country_code,
+        rdata_trimmed=rdata_trimmed,
+        anomaly_only=anomaly_only,
+    )
+    return {"count": len(items), "items": items}

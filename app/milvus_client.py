@@ -1,4 +1,6 @@
 from pymilvus import connections, utility, Collection, DataType
+from datetime import datetime, timedelta, timezone
+from typing import List, Dict, Optional
 from .config import ZILLIZ_URI, ZILLIZ_TOKEN, COLLECTION_NAME, EMBED_DIM
 
 _coll = None
@@ -45,4 +47,51 @@ def search_vectors(query_vectors, top_k, output_fields=None):
             **fields
         })
     return hits
+
+
+def recent_anomalies(n: int = 20, hours: int = 48, *, country_code: Optional[str] = None,
+                     rdata_trimmed: Optional[str] = None, anomaly_only: bool = False) -> List[Dict]:
+    """
+    Fetch up to `n` most recent anomalies within the last `hours`.
+    Uses ISO hour strings so lexicographic comparisons work as time comparisons.
+    """
+    coll = get_collection()
+
+    # Build Milvus boolean expr (note: event_hour is stored as VARCHAR)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff_str = cutoff.strftime("%Y-%m-%d %H:00:00")
+    expr = f'event_hour >= "{cutoff_str}"'
+    if country_code:
+        expr += f' && country_code == "{country_code}"'
+    if rdata_trimmed:
+        expr += f' && rdata_trimmed == "{rdata_trimmed}"'
+    if anomaly_only:
+        expr += ' && anomaly_type != "unknown"'
+
+    # Pull a reasonable upper bound, then sort/trim in app
+    rows = coll.query(
+        expr=expr,
+        output_fields=[
+            "event_hour","prb_id","rdata_trimmed","country_code","anomaly_type",
+            "median_rtt_hour","p95_rtt_hour","avg_rtt_hour","error_rate_hour","robust_z_rtt","doc_text"
+        ],
+        limit=5000,  # safe upper bound; tune if needed
+    )
+
+    # Sort newest first, then stronger anomalies (higher z, higher error)
+    def safe_float(v):
+        try:
+            return float(v)
+        except Exception:
+            return 0.0
+
+    rows.sort(
+        key=lambda r: (
+            r.get("event_hour", ""),
+            safe_float(r.get("robust_z_rtt")),
+            safe_float(r.get("error_rate_hour")),
+        ),
+        reverse=True,
+    )
+    return rows[:n]
 
